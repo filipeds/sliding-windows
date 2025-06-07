@@ -7,6 +7,7 @@ from config import *
 base = 0
 next_seq = 0
 timers = {}
+ack_table = {i: set() for i in range(TOTAL_PACKETS)}
 lock = threading.Lock()
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -18,7 +19,8 @@ def enviar_pacote(seq):
         "data": f"Mensagem {seq}",
         "ack": False
     }
-    sock.sendto(json.dumps(pacote).encode(), (RECEIVER_IP, RECEIVER_PORT))
+    for ip in RECEIVER_IPS:
+        sock.sendto(json.dumps(pacote).encode(), (ip, RECEIVER_PORT))
     print(f"📤 Enviado: {pacote}")
 
 def start_timer(seq):
@@ -37,18 +39,21 @@ def timeout_handler(seq):
 def escutar_acks():
     global base
     while True:
-        data, _ = sock.recvfrom(1024)
+        data, addr = sock.recvfrom(1024)
         ack = json.loads(data.decode())
         if ack.get("ack"):
             with lock:
                 seq_ack = ack["seq"]
-                if seq_ack >= base:
-                    print(f"✅ ACK recebido: {seq_ack}")
-                    for i in range(base, seq_ack + 1):
-                        if i in timers:
-                            timers[i].cancel()
-                            del timers[i]
-                    base = seq_ack + 1
+                sender_ip = addr[0]
+                ack_table[seq_ack].add(sender_ip)
+                print(f"✅ ACK de {sender_ip} para pacote {seq_ack}")
+
+                # Avança base somente se todos os receptores confirmaram
+                while base < TOTAL_PACKETS and all(ip in ack_table[base] for ip in RECEIVER_IPS):
+                    if base in timers:
+                        timers[base].cancel()
+                        del timers[base]
+                    base += 1
 
 def emissor():
     global next_seq
@@ -66,7 +71,7 @@ def emissor():
     while base < TOTAL_PACKETS:
         time.sleep(1)
 
-    print("✅ Todos os pacotes enviados e reconhecidos!")
+    print("✅ Todos os pacotes enviados e reconhecidos por todos os receptores!")
 
 if __name__ == "__main__":
     emissor()

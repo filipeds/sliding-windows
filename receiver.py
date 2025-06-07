@@ -5,7 +5,7 @@ from config import *
 expected_seq = 0
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((RECEIVER_IP, RECEIVER_PORT))
+sock.bind(("0.0.0.0", RECEIVER_PORT))
 
 print("📡 Receptor pronto...")
 
@@ -24,6 +24,5 @@ while True:
             expected_seq += 1
         else:
             print(f"❌ Pacote {seq} fora de ordem (esperado: {expected_seq})")
-            # Reenvia ACK do último correto
             ack = { "seq": expected_seq - 1, "ack": True }
             sock.sendto(json.dumps(ack).encode(), addr)
