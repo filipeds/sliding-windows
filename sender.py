@@ -48,7 +48,6 @@ def escutar_acks():
                 ack_table[seq_ack].add(sender_ip)
                 print(f"✅ ACK de {sender_ip} para pacote {seq_ack}")
 
-                # Avança base somente se todos os receptores confirmaram
                 while base < TOTAL_PACKETS and all(ip in ack_table[base] for ip in RECEIVER_IPS):
                     if base in timers:
                         timers[base].cancel()
@@ -67,11 +66,16 @@ def emissor():
                 next_seq += 1
         time.sleep(0.5)
 
-    # Espera fim dos ACKs
     while base < TOTAL_PACKETS:
         time.sleep(1)
 
     print("✅ Todos os pacotes enviados e reconhecidos por todos os receptores!")
+
+    # Envia pacote de fim
+    fim_pacote = json.dumps({ "fim": True }).encode()
+    for ip in RECEIVER_IPS:
+        sock.sendto(fim_pacote, (ip, RECEIVER_PORT))
+    print("📴 Pacotes de fim enviados.")
 
 if __name__ == "__main__":
     emissor()
